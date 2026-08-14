@@ -18,6 +18,42 @@ orçamentos salvos ficam disponíveis mesmo depois de fechar e abrir o navegador
 > navegadores restringem armazenamento em `file://`), sirva a pasta com qualquer servidor
 > estático — por exemplo `npx serve .` (se tiver Node.js) — e acesse via `http://localhost`.
 
+## Deploy no Railway (via GitHub)
+
+Este projeto já está preparado para deploy: contém `package.json` com um servidor estático
+(`serve`), então o Railway detecta e sobe sozinho, sem configuração extra.
+
+**Importante**: como o app guarda os orçamentos no navegador de cada pessoa (IndexedDB), ao
+publicar assim, **cada usuário terá seus próprios orçamentos**, isolados no próprio
+dispositivo/navegador — ninguém vê o orçamento de outro colega, e os dados não aparecem se a
+pessoa abrir de outro computador. Os Parâmetros Técnicos também começam com os valores padrão
+da planilha em cada navegador. Se depois quiser que todos compartilhem os mesmos dados, é
+necessário migrar para um banco de dados compartilhado (ver seção abaixo).
+
+Passo a passo:
+
+1. **Criar o repositório no GitHub** (via navegador, em github.com/new): dê um nome (ex.:
+   `calculadora-biomassa-lightwall`), pode deixar **privado**, e crie **sem** marcar
+   "Add a README" (o projeto já tem um).
+2. **Enviar o código** (rode estes comandos na pasta do projeto, substituindo a URL pela do
+   seu repositório):
+   ```bash
+   git remote add origin https://github.com/SEU-USUARIO/calculadora-biomassa-lightwall.git
+   git branch -M main
+   git push -u origin main
+   ```
+   Na primeira vez, o Windows deve abrir uma janela do navegador pedindo para você fazer
+   login no GitHub e autorizar — é o fluxo normal de autenticação do Git, sem precisar digitar
+   senha no terminal.
+3. **Criar o projeto no Railway**: em railway.app → **New Project** → **Deploy from GitHub
+   repo** → selecione o repositório que você acabou de criar. O Railway detecta o
+   `package.json` automaticamente e faz o build/deploy sem precisar configurar nada.
+4. **Gerar o link público**: dentro do projeto no Railway, vá em **Settings → Networking →
+   Generate Domain**. Isso cria uma URL pública (algo como
+   `calculadora-biomassa-lightwall.up.railway.app`) que você pode enviar aos usuários.
+5. Prontinho — qualquer novo `git push` para o branch `main` faz o Railway atualizar o site
+   automaticamente.
+
 ## Estrutura do projeto
 
 ```
