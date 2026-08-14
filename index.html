@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora Biomassa &amp; Lightwall</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231f7a4d'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='white' font-family='Arial'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark">B</div>
+        <div class="brand-text">
+          <strong>Biomassa</strong>
+          <span>&amp; Lightwall</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <a href="#/dashboard" data-route="/dashboard" class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 13h4v8H3v-8Zm7-9h4v17h-4V4Zm7 5h4v12h-4V9Z"/></svg>
+          <span>Dashboard</span>
+        </a>
+        <a href="#/calculadora" data-route="/calculadora" class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 4v3h12V6H6Zm0 5v2h3v-2H6Zm5 0v2h3v-2h-3Zm5 0v2h3v-2h-3Zm-10 4v2h3v-2H6Zm5 0v2h3v-2h-3Zm5 0v2h3v-2h-3Zm-10 4v2h3v-2H6Zm5 0v2h3v-2h-3Z"/></svg>
+          <span>Calculadora</span>
+        </a>
+        <a href="#/orcamentos" data-route="/orcamentos" class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M7 2h8l5 5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm7 1.5V8h4.5L14 3.5ZM8 12h8v1.5H8V12Zm0 3.5h8V17H8v-1.5ZM8 8.5h4V10H8V8.5Z"/></svg>
+          <span>Orçamentos</span>
+        </a>
+        <a href="#/parametros" data-route="/parametros" class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="m19.4 13-.9-.5a7.9 7.9 0 0 0 0-1l.9-.5a1 1 0 0 0 .4-1.3l-1-1.8a1 1 0 0 0-1.3-.4l-.9.5a8 8 0 0 0-1.7-1l-.1-1a1 1 0 0 0-1-.9h-2a1 1 0 0 0-1 .9l-.1 1a8 8 0 0 0-1.7 1l-.9-.5a1 1 0 0 0-1.3.4l-1 1.8a1 1 0 0 0 .4 1.3l.9.5a7.9 7.9 0 0 0 0 1l-.9.5a1 1 0 0 0-.4 1.3l1 1.8a1 1 0 0 0 1.3.4l.9-.5a8 8 0 0 0 1.7 1l.1 1a1 1 0 0 0 1 .9h2a1 1 0 0 0 1-.9l.1-1a8 8 0 0 0 1.7-1l.9.5a1 1 0 0 0 1.3-.4l1-1.8a1 1 0 0 0-.4-1.3ZM12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z"/></svg>
+          <span>Parâmetros Técnicos</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <p>Sistema de quantitativos<br>Biomassa &amp; Lightwall</p>
+      </div>
+    </aside>
+
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+    <!-- Main -->
+    <div class="main">
+      <header class="topbar">
+        <button id="btn-menu" class="icon-btn" aria-label="Abrir menu">
+          <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <h1 id="page-title" class="page-title">Dashboard</h1>
+        <div class="topbar-spacer"></div>
+      </header>
+      <main id="view" class="view"></main>
+    </div>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-root"></div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/calculos.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/views.js"></script>
+  <script src="js/router.js"></script>
+</body>
+</html>

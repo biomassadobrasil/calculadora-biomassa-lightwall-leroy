@@ -1,0 +1,12 @@
+{
+  "name": "calculadora-biomassa-lightwall",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Calculadora de quantitativo de materiais Biomassa & Lightwall",
+  "scripts": {
+    "start": "serve -s . -l ${PORT:-3000}"
+  },
+  "dependencies": {
+    "serve": "^14.2.3"
+  }
+}
