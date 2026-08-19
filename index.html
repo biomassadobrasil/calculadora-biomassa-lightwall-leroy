@@ -19,7 +19,7 @@
         </div>
       </div>
       <nav class="sidebar-nav" id="sidebar-nav">
-        <a href="#/dashboard" data-route="/dashboard" class="nav-item">
+        <a href="#/dashboard" data-route="/dashboard" class="nav-item" data-roles="master">
           <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 13h4v8H3v-8Zm7-9h4v17h-4V4Zm7 5h4v12h-4V9Z"/></svg>
           <span>Dashboard</span>
         </a>
@@ -31,9 +31,13 @@
           <svg class="nav-icon" viewBox="0 0 24 24"><path d="M7 2h8l5 5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm7 1.5V8h4.5L14 3.5ZM8 12h8v1.5H8V12Zm0 3.5h8V17H8v-1.5ZM8 8.5h4V10H8V8.5Z"/></svg>
           <span>Orçamentos</span>
         </a>
-        <a href="#/parametros" data-route="/parametros" class="nav-item">
+        <a href="#/parametros" data-route="/parametros" class="nav-item" data-roles="master">
           <svg class="nav-icon" viewBox="0 0 24 24"><path d="m19.4 13-.9-.5a7.9 7.9 0 0 0 0-1l.9-.5a1 1 0 0 0 .4-1.3l-1-1.8a1 1 0 0 0-1.3-.4l-.9.5a8 8 0 0 0-1.7-1l-.1-1a1 1 0 0 0-1-.9h-2a1 1 0 0 0-1 .9l-.1 1a8 8 0 0 0-1.7 1l-.9-.5a1 1 0 0 0-1.3.4l-1 1.8a1 1 0 0 0 .4 1.3l.9.5a7.9 7.9 0 0 0 0 1l-.9.5a1 1 0 0 0-.4 1.3l1 1.8a1 1 0 0 0 1.3.4l.9-.5a8 8 0 0 0 1.7 1l.1 1a1 1 0 0 0 1 .9h2a1 1 0 0 0 1-.9l.1-1a8 8 0 0 0 1.7-1l.9.5a1 1 0 0 0 1.3-.4l1-1.8a1 1 0 0 0-.4-1.3ZM12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z"/></svg>
           <span>Parâmetros Técnicos</span>
+        </a>
+        <a href="#/usuarios" data-route="/usuarios" class="nav-item" data-roles="master">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4 0-7 2-7 4.5V21h14v-2.5C16 16 13 14 9 14Zm8.5-6.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm0 2c-1 0-1.9.16-2.7.44 1.66 1.02 2.7 2.5 2.7 4.06V21h6v-2.5c0-2.5-2.9-4.5-6-4.5Z"/></svg>
+          <span>Usuários</span>
         </a>
       </nav>
       <div class="sidebar-footer">
@@ -51,6 +55,7 @@
         </button>
         <h1 id="page-title" class="page-title">Dashboard</h1>
         <div class="topbar-spacer"></div>
+        <div id="topbar-user" class="row hidden" style="align-items:center;"></div>
       </header>
       <main id="view" class="view"></main>
     </div>

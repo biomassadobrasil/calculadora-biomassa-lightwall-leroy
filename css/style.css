@@ -124,6 +124,16 @@ svg[fill] path { fill: currentColor; stroke: none; }
 
 .view { padding: 24px; max-width: 1280px; width: 100%; margin: 0 auto; }
 
+/* ---------------- Modo autenticação (tela de login) ---------------- */
+body.auth-mode .sidebar,
+body.auth-mode .sidebar-overlay,
+body.auth-mode .topbar { display: none !important; }
+body.auth-mode .main { margin-left: 0; }
+body.auth-mode .view {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+
 /* ---------------- Utility ---------------- */
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .row { display: flex; align-items: center; gap: 10px; }
@@ -277,6 +287,7 @@ tbody tr:hover { background: var(--color-primary-lighter); }
 .badge-blue { background: var(--color-info-light); color: var(--color-info); }
 .badge-amber { background: var(--color-warning-light); color: var(--color-warning); }
 .badge-gray { background: var(--color-bg); color: var(--color-text-muted); }
+.badge-red { background: var(--color-danger-light); color: var(--color-danger); }
 
 /* ---------------- Result blocks (calculator) ---------------- */
 .result-section { border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
@@ -389,4 +400,5 @@ tbody tr:hover { background: var(--color-primary-lighter); }
   .kpi-grid { grid-template-columns: 1fr; }
   .calc-summary-grid { grid-template-columns: 1fr 1fr; }
   .modal-body, .modal-header, .modal-footer { padding: 16px; }
+  #topbar-user .small { display: none; }
 }

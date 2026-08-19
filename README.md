@@ -1,170 +1,136 @@
 # Calculadora Biomassa & Lightwall
 
 Aplicativo web para cálculo de quantitativo de materiais das linhas **Biomassa & Lightwall**
-(painéis, tratamento de juntas, pintura/texturas e verniz PU), convertido a partir da planilha
-`Calculadora BIOMASSA & LIGHTWALL - Leroy Merlin.xlsx`.
+(painéis, tratamento de juntas, pintura/texturas e verniz PU), com **login e controle de
+acesso por perfil de usuário** (Master / Colaborador).
 
-## Como abrir (uso local, sem instalar nada)
+> Esta é a versão 2 do projeto. A versão 1 era um app estático sem login, com dados salvos no
+> navegador de cada pessoa. Esta versão adiciona um backend real (Node.js + Express) e um
+> banco de dados compartilhado (PostgreSQL), necessários para que o gestor (Master) veja os
+> orçamentos de todos os colaboradores e para que as permissões sejam aplicadas de forma segura
+> no servidor — não apenas na tela.
 
-1. Dê duplo clique em `index.html` (abre no seu navegador padrão), **ou**
-2. Clique com o botão direito → Abrir com → Chrome/Edge.
-
-Não é necessário instalar Node.js, servidor ou qualquer dependência. O app roda 100% no
-navegador e guarda os dados localmente no próprio navegador (IndexedDB) — ou seja, os
-orçamentos salvos ficam disponíveis mesmo depois de fechar e abrir o navegador de novo,
-**no mesmo computador e no mesmo navegador** em que foram criados.
-
-> Se seu navegador bloquear IndexedDB para arquivos abertos via duplo clique (raro, alguns
-> navegadores restringem armazenamento em `file://`), sirva a pasta com qualquer servidor
-> estático — por exemplo `npx serve .` (se tiver Node.js) — e acesse via `http://localhost`.
-
-## Deploy no Railway (via GitHub)
-
-Este projeto já está preparado para deploy: contém `package.json` com um servidor estático
-(`serve`), então o Railway detecta e sobe sozinho, sem configuração extra.
-
-**Importante**: como o app guarda os orçamentos no navegador de cada pessoa (IndexedDB), ao
-publicar assim, **cada usuário terá seus próprios orçamentos**, isolados no próprio
-dispositivo/navegador — ninguém vê o orçamento de outro colega, e os dados não aparecem se a
-pessoa abrir de outro computador. Os Parâmetros Técnicos também começam com os valores padrão
-da planilha em cada navegador. Se depois quiser que todos compartilhem os mesmos dados, é
-necessário migrar para um banco de dados compartilhado (ver seção abaixo).
-
-Passo a passo:
-
-1. **Criar o repositório no GitHub** (via navegador, em github.com/new): dê um nome (ex.:
-   `calculadora-biomassa-lightwall`), pode deixar **privado**, e crie **sem** marcar
-   "Add a README" (o projeto já tem um).
-2. **Enviar o código** (rode estes comandos na pasta do projeto, substituindo a URL pela do
-   seu repositório):
-   ```bash
-   git remote add origin https://github.com/SEU-USUARIO/calculadora-biomassa-lightwall.git
-   git branch -M main
-   git push -u origin main
-   ```
-   Na primeira vez, o Windows deve abrir uma janela do navegador pedindo para você fazer
-   login no GitHub e autorizar — é o fluxo normal de autenticação do Git, sem precisar digitar
-   senha no terminal.
-3. **Criar o projeto no Railway**: em railway.app → **New Project** → **Deploy from GitHub
-   repo** → selecione o repositório que você acabou de criar. O Railway detecta o
-   `package.json` automaticamente e faz o build/deploy sem precisar configurar nada.
-4. **Gerar o link público**: dentro do projeto no Railway, vá em **Settings → Networking →
-   Generate Domain**. Isso cria uma URL pública (algo como
-   `calculadora-biomassa-lightwall.up.railway.app`) que você pode enviar aos usuários.
-5. Prontinho — qualquer novo `git push` para o branch `main` faz o Railway atualizar o site
-   automaticamente.
-
-## Estrutura do projeto
+## Arquitetura
 
 ```
 calculadora-biomassa-app/
-├─ index.html          # shell da aplicação (layout, sidebar, roteador)
-├─ css/
-│  └─ style.css        # design system completo (cores, componentes, responsivo)
-└─ js/
-   ├─ utils.js          # helpers: formatação, DOM, toast, modal, confirmação
-   ├─ db.js             # camada de dados — IndexedDB (substitui a planilha)
-   ├─ calculos.js        # motor de cálculo — todas as fórmulas da planilha
-   ├─ charts.js          # gráficos SVG do dashboard (sem dependências externas)
-   ├─ views.js           # páginas: Dashboard, Calculadora, Orçamentos, Parâmetros
-   └─ router.js          # roteador via hash (#/dashboard, #/orcamentos, ...)
+├─ index.html, css/, js/        # Frontend (SPA com roteamento por hash) — inalterado na
+│                                  aparência; agora consome uma API em vez do IndexedDB.
+│  ├─ js/db.js                    Cliente HTTP da API (login, orçamentos, parâmetros, usuários)
+│  ├─ js/calculos.js              Motor de cálculo — SEM ALTERAÇÃO nenhuma nesta atualização
+│  ├─ js/views.js                 Páginas: login, dashboard, calculadora, orçamentos, parâmetros, usuários
+│  └─ js/router.js                Roteador com guarda de autenticação e de perfil
+└─ server/                      # Backend Node.js + Express (novo)
+   ├─ index.js                    Servidor HTTP: API + arquivos estáticos
+   ├─ db.js                       Conexão PostgreSQL, migrações e seed inicial
+   ├─ auth.js                     Login (JWT em cookie httpOnly), hashing de senha, middlewares
+   └─ routes/
+      ├─ auth.js                  POST /login, POST /logout, GET /me
+      ├─ orcamentos.js             CRUD de orçamentos com controle de acesso por perfil
+      ├─ parametros.js             CRUD dos rendimentos técnicos (leitura livre, escrita só Master)
+      └─ usuarios.js                CRUD de usuários (somente Master)
 ```
 
-Nenhuma etapa de build é necessária — são arquivos HTML/CSS/JS puros, sem frameworks,
-sem `npm install`, sem bundler.
+**O que foi preservado sem alteração:** o motor de cálculo (`js/calculos.js`), os gráficos
+(`js/charts.js`), os helpers de UI (`js/utils.js`) e todo o design visual (`css/style.css`,
+paleta de cores, layout, sidebar, cards, tabelas). As fórmulas e a lógica de negócio das 3
+abas da planilha continuam exatamente as mesmas.
 
-## Estrutura de dados (IndexedDB)
+## Perfis de acesso
 
-Como pedido, o app **não depende de planilha como banco de dados**. Os dados vivem em duas
-"tabelas" (object stores) no IndexedDB do navegador:
+| | **Master** (gestor) | **Básico** (colaborador) |
+|---|---|---|
+| Dashboard geral | ✅ | ❌ (redirecionado para "Meus Orçamentos") |
+| Ver orçamentos | Todos, de todos os colaboradores | Somente os que ele mesmo criou |
+| Criar orçamento | ✅ | ✅ |
+| Editar/excluir orçamento | Qualquer um | Somente os próprios |
+| Parâmetros Técnicos | Ver e editar | Sem acesso (menu oculto) |
+| Usuários (cadastro) | Ver, criar, editar, ativar/desativar | Sem acesso |
 
-- **`orcamentos`** — cada orçamento salvo: título, cliente, responsável, status, observações,
-  datas, e a lista de cálculos incluídos. Cada cálculo grava tanto os **inputs** informados
-  quanto um **snapshot dos resultados** no momento do cálculo — assim, se você editar um
-  parâmetro técnico depois, orçamentos antigos **não mudam retroativamente**.
-- **`parametros`** — os rendimentos/regras técnicas usadas nas fórmulas (equivalentes às
-  colunas "Rendimento" da planilha original). Totalmente editável pela tela
-  **Parâmetros Técnicos**, com opção de restaurar os valores originais da planilha.
+**A regra é aplicada no servidor, não só na tela.** Cada rota da API (`server/routes/*.js`)
+confere o usuário autenticado (via cookie de sessão) e o perfil dele antes de responder:
+- `GET /api/orcamentos` — Master recebe todos os registros; Colaborador recebe **apenas** os
+  que têm `created_by_id` igual ao próprio ID (filtrado na consulta SQL, não no frontend).
+- `GET/PUT/DELETE /api/orcamentos/:id` — se o orçamento não pertence ao usuário e ele não é
+  Master, a API responde **403 (Forbidden)** — inclusive se o ID for digitado direto na URL.
+- Escrita em `/api/parametros` e qualquer rota em `/api/usuarios` exigem perfil Master
+  (`requireRole("master")`); um Colaborador que tentar chamar essas rotas diretamente recebe 403.
+- O campo "responsável" de um orçamento é sempre preenchido pelo servidor com os dados de
+  quem está logado (`req.user`) — nunca é aceito um valor enviado pelo cliente.
 
-## Funcionalidades implementadas
+## Fluxo de novo orçamento
 
-- **Dashboard**: indicadores (total de orçamentos, em aberto/execução, m² já quantificados,
-  acabamento mais usado), gráfico de distribuição por tipo de cálculo, gráfico por status,
-  lista dos últimos orçamentos.
-- **Calculadora**: formulário único com os 3 módulos de cálculo (cada um pode ser
-  ativado/desativado independentemente, permitindo combinar, por exemplo, Assentamento +
-  Pintura no mesmo orçamento), validação em tempo real, resultado calculado instantaneamente
-  a cada tecla, com quantidade exata e quantidade recomendada para compra (arredondada para
-  cima).
-- **Orçamentos**: listagem com busca (título/cliente/responsável), filtro por tipo de cálculo
-  e por status (combináveis), ordenação por coluna, exportação para CSV (abre no Excel),
-  exclusão com modal de confirmação.
-- **Detalhe do Orçamento**: visualização completa de todos os cálculos e materiais, exportar
-  CSV, imprimir/exportar PDF (via impressão do navegador — Ctrl+P → Salvar como PDF).
-- **Parâmetros Técnicos**: CRUD completo dos rendimentos usados nas fórmulas — editar, criar
-  novo parâmetro, excluir (com confirmação), restaurar valores originais da planilha.
-- **Responsivo**: menu lateral recolhível em telas de celular/tablet, cards e tabelas se
-  adaptam à largura da tela, tabelas com rolagem horizontal quando necessário.
+1. Colaborador clica em **Novo Orçamento**.
+2. O sistema exige **Nome, Telefone e E-mail** do cliente antes de liberar o restante do
+   formulário (tela "Dados do Cliente").
+3. Ele monta o orçamento normalmente (Assentamento, Pintura e/ou Verniz PU).
+4. Ao salvar, o backend grava: ID e nome do usuário, perfil, data/hora de criação, cliente
+   vinculado e status — tudo isso fica preso ao registro para sempre.
+5. **Nenhuma ação extra é necessária**: como o Master vê todos os registros da tabela, o
+   orçamento aparece para ele imediatamente após salvar.
 
-## Regras de negócio convertidas (fórmulas da planilha)
+## Status do orçamento
 
-Todas as fórmulas das 3 abas foram implementadas em `js/calculos.js`, com **duas correções
-aprovadas** em relação à planilha original:
+`Rascunho → Em elaboração → Enviado → Em negociação → Aprovado / Recusado / Cancelado`
 
-1. **Pintura/Texturas — "BioRevest Pedras Naturais"**: a planilha original dividia pela
-   célula `C9` (vazia), sempre retornando 0. O app usa a área Externa (`C8`), igual às
-   demais linhas do mesmo grupo.
-2. **Metragem de painéis (Assentamento e Verniz PU)**: a planilha usava a constante fixa
-   `1,83` (3 × 0,61) em vez de recalcular com a altura/largura reais informadas. O app
-   calcula dinamicamente (`quantidade × altura × largura`), refletindo corretamente qualquer
-   painel de tamanho diferente do padrão.
+## Configuração para rodar (Railway)
 
-Todas as demais fórmulas (percentuais de tratamento de juntas, rendimentos de cada produto,
-regras de arredondamento ROUND/ROUNDUP, conversão de embalagens em caixas, opções de garantia
-do verniz PU etc.) foram mantidas fielmente — ver comentários em `js/calculos.js` e `js/db.js`
-para o mapeamento completo de cada constante.
+O app precisa de três coisas configuradas no Railway antes de funcionar:
 
-### Itens da planilha que não foram implementados (por decisão do usuário)
+### 1. Banco de dados PostgreSQL
+No seu projeto Railway: **New** → **Database** → **Add PostgreSQL**. O Railway injeta
+automaticamente a variável `DATABASE_URL` no serviço — não precisa copiar nada manualmente
+(desde que o banco esteja no mesmo projeto).
 
-- Colunas de preço (R$): estavam vazias na planilha original em todas as abas; por decisão,
-  o app calcula apenas quantitativo de materiais, sem custos.
-- Login/usuários/permissões: não implementado nesta primeira versão (uso interno, sem
-  necessidade de autenticação por ora).
+### 2. Variáveis de ambiente
+Em **Settings → Variables** do serviço da aplicação, adicione:
 
-## Limitações conhecidas / ambiente de teste
+| Variável | Valor |
+|---|---|
+| `JWT_SECRET` | uma string aleatória longa e secreta (gerada para este projeto — ver mensagem separada) |
+| `MASTER_EMAIL` | o e-mail do primeiro usuário Master (ex.: seu e-mail) |
+| `MASTER_PASSWORD` | a senha inicial desse usuário Master (troque depois de logar, se quiser) |
 
-- Testado nesta máquina via automação de navegador (sem captura visual de tela disponível no
-  momento do desenvolvimento) — todo o fluxo funcional foi validado por inspeção de DOM/estado
-  (cálculos, salvar/editar/excluir, filtros, exportação, CRUD de parâmetros, persistência após
-  reload). Recomenda-se uma conferência visual rápida ao abrir por conta própria, especialmente
-  em celular.
-- Os dados ficam no navegador local (IndexedDB) — **não são compartilhados entre
-  computadores ou usuários diferentes**. Veja "Publicar para múltiplos usuários" abaixo.
+Essas duas últimas só têm efeito **uma vez**: na primeira inicialização, se a tabela de
+usuários estiver vazia, o servidor cria automaticamente esse usuário Master. Depois disso,
+todos os demais usuários (Master ou Colaborador) são criados pela tela **Usuários**, dentro
+do próprio app.
 
-## Publicar para múltiplos usuários (multiusuário, na internet)
+### 3. Deploy
+Basta um `git push` para o branch `main` — o Railway reconstrói e reinicia o serviço
+automaticamente (ele agora executa `node server/index.js`, em vez do antigo servidor estático).
 
-A versão atual guarda dados no navegador de cada pessoa (sem servidor). Para que várias
-pessoas acessem os **mesmos** orçamentos ao mesmo tempo pela internet, é necessário migrar
-para uma arquitetura com backend + banco de dados compartilhado. Caminho recomendado, quando
-houver Node.js disponível:
+## Primeiro acesso
 
-1. **Backend**: Next.js (API Routes ou Server Actions) ou um serviço simples em Express.
-2. **Banco de dados**: PostgreSQL (ex.: Neon, Supabase, Railway) via Prisma ORM — o schema já
-   está desenhado neste app (`orcamentos` e `parametros`), bastando traduzir as mesmas
-   entidades de IndexedDB para tabelas SQL.
-3. **Login** (se necessário no futuro): NextAuth.js ou Auth.js, com 2 perfis (administrador e
-   usuário comum) controlando quem pode editar Parâmetros Técnicos.
-4. **Deploy**: Vercel, Railway ou qualquer host com suporte a Node.js.
+1. Acesse a URL do app — você verá a tela de login.
+2. Entre com o `MASTER_EMAIL` / `MASTER_PASSWORD` configurados no passo anterior.
+3. Vá em **Usuários** → **Novo Usuário** para cadastrar os colaboradores (perfil "Básico").
+4. Cada colaborador recebe o e-mail/senha e faz login para começar a criar orçamentos.
 
-Como esta máquina não possui Node.js instalado, essa migração não foi feita nesta entrega —
-mas a lógica de cálculo (`js/calculos.js`) e o modelo de dados já estão isolados e prontos
-para serem reaproveitados quase sem alteração num backend real.
+## Rodar localmente (opcional, requer Node.js instalado)
+
+```bash
+npm install
+# defina DATABASE_URL, JWT_SECRET, MASTER_EMAIL, MASTER_PASSWORD no seu ambiente
+npm start
+```
+
+## Itens do pedido que não têm dado correspondente no sistema hoje
+
+- **"Valor do orçamento"**: o sistema calcula apenas quantitativo de materiais (por decisão
+  tomada no início do projeto) — não existe preço/valor monetário associado a um orçamento.
+  As telas de Master e de listagem foram montadas sem essa coluna. Se depois quiser adicionar
+  um cadastro de preços por produto, dá para calcular o valor total automaticamente a partir
+  dos itens já quantificados.
+- **Regra de "avançar" com botão bloqueado**: em vez de um botão desabilitado, a tela de
+  "Dados do Cliente" valida ao clicar em Continuar e mostra a mensagem de erro pedida
+  ("Para iniciar o orçamento, preencha Nome, Telefone e E-mail do cliente.") — funcionalmente
+  equivalente, mas com melhor feedback de qual campo falta.
 
 ## Melhorias futuras sugeridas
 
-- Cadastro de preços por produto, com cálculo automático do valor total do orçamento.
-- Geração de PDF com identidade visual da empresa (logo, cabeçalho) em vez do PDF de
-  impressão genérico do navegador.
-- Sincronização entre dispositivos (exigiria o backend descrito acima).
-- Histórico de alterações de parâmetros técnicos (auditoria de quem mudou o quê e quando).
-- Gráfico de evolução de orçamentos por período (linha do tempo mensal).
+- Adicionar cadastro de preços por produto e cálculo automático do valor total do orçamento.
+- Log de auditoria (quem alterou o quê e quando) além do `updated_at` atual.
+- Recuperação de senha por e-mail (hoje, só o Master pode redefinir a senha de alguém pela
+  tela de Usuários).
+- Exportação de PDF com identidade visual da empresa, em vez do PDF de impressão do navegador.
