@@ -27,7 +27,7 @@ calculadora-biomassa-app/
    └─ routes/
       ├─ auth.js                  POST /login, POST /logout, GET /me
       ├─ orcamentos.js             CRUD de orçamentos com controle de acesso por perfil
-      ├─ parametros.js             CRUD dos rendimentos técnicos (leitura livre, escrita só Master)
+      ├─ parametros.js             CRUD dos rendimentos técnicos (leitura livre, escrita só Master) + auditoria
       └─ usuarios.js                CRUD de usuários (somente Master)
 ```
 
@@ -44,7 +44,8 @@ abas da planilha continuam exatamente as mesmas.
 | Ver orçamentos | Todos, de todos os colaboradores | Somente os que ele mesmo criou |
 | Criar orçamento | ✅ | ✅ |
 | Editar/excluir orçamento | Qualquer um | Somente os próprios |
-| Parâmetros Técnicos | Ver e editar | Sem acesso (menu oculto) |
+| Parâmetros Técnicos | Ver, criar, editar, excluir, restaurar padrões | Somente visualizar (campos e ações de edição não aparecem) |
+| Histórico de Alterações (Parâmetros) | Ver (quem, o quê, antes/depois, quando) | Sem acesso |
 | Usuários (cadastro) | Ver, criar, editar, ativar/desativar | Sem acesso |
 
 **A regra é aplicada no servidor, não só na tela.** Cada rota da API (`server/routes/*.js`)
@@ -57,6 +58,30 @@ confere o usuário autenticado (via cookie de sessão) e o perfil dele antes de 
   (`requireRole("master")`); um Colaborador que tentar chamar essas rotas diretamente recebe 403.
 - O campo "responsável" de um orçamento é sempre preenchido pelo servidor com os dados de
   quem está logado (`req.user`) — nunca é aceito um valor enviado pelo cliente.
+
+## Auditoria dos Parâmetros Técnicos
+
+Toda inclusão, alteração ou exclusão de um parâmetro técnico grava automaticamente um registro
+permanente na tabela `parametros_auditoria` — o usuário nunca precisa (nem consegue) preencher
+isso manualmente:
+
+- Cada alteração de um parâmetro existente gera **uma linha por campo realmente modificado**
+  (ex.: se você mudar só o "Rendimento", só o Rendimento aparece no histórico — com o valor de
+  antes e o de depois). Se nada mudou de fato, nenhuma linha é criada.
+- Inclusão e exclusão geram um registro com o retrato completo do parâmetro (antes/depois).
+- "Restaurar padrões da planilha" também é auditado: uma exclusão para cada parâmetro antigo e
+  uma inclusão para cada valor padrão restaurado.
+- Cada linha traz: ID e nome do usuário, perfil, data/hora exata, produto/regra afetado, campo,
+  valor anterior e novo valor, e o tipo de ação (Inclusão / Alteração / Exclusão).
+- A gravação do parâmetro e do registro de auditoria acontecem **na mesma transação de banco**
+  (`server/db.js: withTransaction`) — ou os dois são salvos juntos, ou a alteração inteira é
+  desfeita. Nunca existe uma alteração "sem rastro".
+- **Não existe nenhuma rota de API para editar ou apagar registros de auditoria** — nem para
+  Master, nem para ninguém. É uma tabela somente-inserção; a única forma de "limpar" seria
+  acessando o banco de dados diretamente, fora da aplicação.
+- Tela **Histórico de Alterações** (dentro de Parâmetros Técnicos, acesso exclusivo Master):
+  lista tudo do mais recente para o mais antigo, com busca por usuário/produto/campo e filtro
+  por tipo de ação.
 
 ## Fluxo de novo orçamento
 

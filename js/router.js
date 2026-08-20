@@ -13,7 +13,8 @@
     { path: "/orcamentos/:id/editar", pattern: /^\/orcamentos\/([^/]+)\/editar$/, title: "Editar Orçamento", render: (m) => Views.calculadora(view, m[1]) },
     { path: "/orcamentos/:id", pattern: /^\/orcamentos\/([^/]+)$/, title: "Detalhe do Orçamento", render: (m) => Views.orcamentoDetalhe(view, m[1]) },
     { path: "/orcamentos", pattern: /^\/orcamentos$/, title: "Orçamentos", render: () => Views.orcamentosList(view) },
-    { path: "/parametros", pattern: /^\/parametros$/, title: "Parâmetros Técnicos", roles: ["master"], render: () => Views.parametros(view) },
+    { path: "/parametros", pattern: /^\/parametros$/, title: "Parâmetros Técnicos", render: () => Views.parametros(view) },
+    { path: "/parametros/historico", pattern: /^\/parametros\/historico$/, title: "Histórico de Alterações", roles: ["master"], render: () => Views.parametrosHistorico(view) },
     { path: "/usuarios", pattern: /^\/usuarios$/, title: "Usuários", roles: ["master"], render: () => Views.usuarios(view) },
   ].map((r) => Object.assign(r, { pattern: r.pattern || new RegExp("^" + r.path.replace(/\//g, "\\/") + "$") }));
 

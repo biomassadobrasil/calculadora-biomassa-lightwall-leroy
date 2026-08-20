@@ -89,6 +89,9 @@
     async resetDefaults() {
       return api("/api/parametros/reset", { method: "POST" });
     },
+    async auditoria() {
+      return api("/api/parametros/auditoria");
+    },
     async getMap() {
       const all = await this.list();
       const map = {};

@@ -888,6 +888,8 @@
     let all = await DB.Parametros.list();
     container.innerHTML = "";
 
+    const master = isMaster();
+
     const TIPO_FILTRO = { "": "Todos", geral: "Regras Gerais", assentamento: TIPO_LABEL.assentamento, pintura: TIPO_LABEL.pintura, verniz_pu: TIPO_LABEL.verniz_pu };
     let tipoAtivo = "";
     const tabs = el("div", { class: "tabs" }, Object.keys(TIPO_FILTRO).map((k) => {
@@ -898,40 +900,56 @@
 
     const btnNovo = el("button", { class: "btn btn-primary" }, [iconPlus(), "Novo Parâmetro"]);
     const btnReset = el("button", { class: "btn btn-secondary" }, ["Restaurar padrões da planilha"]);
+    const btnHistorico = el("a", { class: "btn btn-secondary", href: "#/parametros/historico" }, [iconClock(), "Histórico de Alterações"]);
     const tableWrap = el("div", { class: "mt-16" });
 
-    const alertBox = el("div", { class: "alert alert-info mt-16" }, [
-      iconSvg("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-6h2Zm0-8h-2V7h2Z"),
-      el("span", {}, ["Estes são os rendimentos técnicos usados nas fórmulas (equivalentes às colunas \"Rendimento\" da planilha original). Alterar um valor aqui afeta apenas os ", el("strong", {}, ["novos"]), " cálculos — orçamentos já salvos mantêm o valor usado no momento em que foram calculados."]),
-    ]);
+    const alertBox = master
+      ? el("div", { class: "alert alert-info mt-16" }, [
+          iconSvg("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-6h2Zm0-8h-2V7h2Z"),
+          el("span", {}, ["Estes são os rendimentos técnicos usados nas fórmulas (equivalentes às colunas \"Rendimento\" da planilha original). Alterar um valor aqui afeta apenas os ", el("strong", {}, ["novos"]), " cálculos — orçamentos já salvos mantêm o valor usado no momento em que foram calculados. Toda alteração é registrada no ", el("strong", {}, ["Histórico de Alterações"]), "."]),
+        ])
+      : el("div", { class: "alert alert-warning mt-16" }, [
+          iconSvg("M12 9v4m0 4h.01M10.3 3.9 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"),
+          el("span", {}, ["Os parâmetros técnicos são gerenciados exclusivamente por usuários Master. Você pode consultar os valores usados nos cálculos, mas não pode editá-los."]),
+        ]);
 
     function renderList() {
       tableWrap.innerHTML = "";
       const list = all.filter((p) => !tipoAtivo || p.tipoCalculo === tipoAtivo);
       if (!list.length) {
-        tableWrap.appendChild(emptyState("Nenhum parâmetro nesta categoria", "Adicione um novo parâmetro técnico.", null, null));
+        tableWrap.appendChild(emptyState("Nenhum parâmetro nesta categoria", master ? "Adicione um novo parâmetro técnico." : "Nenhum parâmetro cadastrado ainda.", null, null));
         return;
       }
+      const headCols = ["Produto / Regra", "Tipo de Cálculo", "Categoria", "Rendimento", "Unidade"];
+      if (master) headCols.push("Ações");
       const table = el("table", {}, [
-        el("thead", {}, [el("tr", {}, ["Produto / Regra", "Tipo de Cálculo", "Categoria", "Rendimento", "Unidade", "Ações"].map((h) => el("th", {}, [h])))]),
-        el("tbody", {}, list.map((p) => el("tr", {}, [
-          el("td", {}, [p.produto]),
-          el("td", {}, [el("span", { class: "badge badge-gray" }, [TIPO_FILTRO[p.tipoCalculo] || p.tipoCalculo])]),
-          el("td", {}, [categoriaBadge(p.categoria)]),
-          el("td", {}, [p.categoria === "acessorio_fixo" ? "Fixo (" + (p.quantidadeFixa ?? 1) + " un)" : fmtNumber(p.rendimento, 2)]),
-          el("td", {}, [p.unidade || "—"]),
-          el("td", {}, [el("div", { class: "table-actions" }, [
-            el("button", { class: "btn btn-ghost btn-icon", title: "Editar", onclick: () => openParametroModal(p) }, [iconEdit()]),
-            el("button", {
-              class: "btn btn-ghost btn-icon", title: "Excluir",
-              onclick: () => confirmDialog({
-                title: "Excluir parâmetro", message: `Excluir "${p.produto}"? Os cálculos passarão a usar o valor padrão original da planilha para este item.`,
-                confirmLabel: "Excluir", danger: true,
-                onConfirm: async () => { await DB.Parametros.remove(p.id); all = all.filter((x) => x.id !== p.id); toast("Parâmetro excluído.", "success"); renderList(); },
-              }),
-            }, [iconTrash()]),
-          ])]),
-        ]))),
+        el("thead", {}, [el("tr", {}, headCols.map((h) => el("th", {}, [h])))]),
+        el("tbody", {}, list.map((p) => {
+          const cells = [
+            el("td", {}, [p.produto]),
+            el("td", {}, [el("span", { class: "badge badge-gray" }, [TIPO_FILTRO[p.tipoCalculo] || p.tipoCalculo])]),
+            el("td", {}, [categoriaBadge(p.categoria)]),
+            el("td", {}, [p.categoria === "acessorio_fixo" ? "Fixo (" + (p.quantidadeFixa ?? 1) + " un)" : fmtNumber(p.rendimento, 2)]),
+            el("td", {}, [p.unidade || "—"]),
+          ];
+          if (master) {
+            cells.push(el("td", {}, [el("div", { class: "table-actions" }, [
+              el("button", { class: "btn btn-ghost btn-icon", title: "Editar", onclick: () => openParametroModal(p) }, [iconEdit()]),
+              el("button", {
+                class: "btn btn-ghost btn-icon", title: "Excluir",
+                onclick: () => confirmDialog({
+                  title: "Excluir parâmetro", message: `Excluir "${p.produto}"? Os cálculos passarão a usar o valor padrão original da planilha para este item.`,
+                  confirmLabel: "Excluir", danger: true,
+                  onConfirm: async () => {
+                    try { await DB.Parametros.remove(p.id); all = all.filter((x) => x.id !== p.id); toast("Parâmetro excluído.", "success"); renderList(); }
+                    catch (e) { toast(e.message || "Não foi possível excluir.", "error"); }
+                  },
+                }),
+              }, [iconTrash()]),
+            ])]));
+          }
+          return el("tr", {}, cells);
+        })),
       ]);
       tableWrap.appendChild(el("div", { class: "table-wrap" }, [table]));
     }
@@ -1000,13 +1018,77 @@
       },
     }));
 
+    const actions = master ? [btnHistorico, btnReset, btnNovo] : [];
     const header = el("div", { class: "row-between" }, [
       el("div", {}, [el("h3", { class: "card-title" }, ["Parâmetros Técnicos"]), el("p", { class: "card-subtitle mt-8" }, ["Rendimentos e regras usadas no motor de cálculo."])]),
-      el("div", { class: "row" }, [btnReset, btnNovo]),
+      el("div", { class: "row" }, actions),
     ]);
 
     container.appendChild(el("div", { class: "stack" }, [header, alertBox, tabs, tableWrap]));
     renderList();
+  }
+
+  // ------------------------------------------------------------
+  // HISTÓRICO DE ALTERAÇÕES — PARÂMETROS TÉCNICOS (somente Master)
+  // ------------------------------------------------------------
+  async function parametrosHistorico(container) {
+    container.innerHTML = "";
+    container.appendChild(loadingBlock());
+    const registros = await DB.Parametros.auditoria();
+    container.innerHTML = "";
+
+    const TIPO_ACAO_BADGE = { "Inclusão": "badge-green", "Alteração": "badge-blue", "Exclusão": "badge-red" };
+
+    const searchBox = el("div", { class: "search-box" }, [iconSearch(), el("input", { type: "search", placeholder: "Buscar por usuário, produto ou campo alterado..." })]);
+    const selAcao = el("select", {}, [
+      el("option", { value: "" }, ["Todas as ações"]),
+      ...Object.keys(TIPO_ACAO_BADGE).map((a) => el("option", { value: a }, [a])),
+    ]);
+
+    const tableWrap = el("div", { class: "mt-16" });
+    const filters = { busca: "", acao: "" };
+
+    function renderTable() {
+      const q = filters.busca.trim().toLowerCase();
+      const list = registros.filter((r) => {
+        const matchesBusca = !q || [r.usuarioNome, r.parametroProduto, r.campoAlterado].some((v) => (v || "").toLowerCase().includes(q));
+        const matchesAcao = !filters.acao || r.tipoAcao === filters.acao;
+        return matchesBusca && matchesAcao;
+      });
+      tableWrap.innerHTML = "";
+      if (!list.length) {
+        tableWrap.appendChild(emptyState("Nenhum registro encontrado", "Ainda não há alterações registradas nos parâmetros técnicos, ou nenhuma corresponde ao filtro.", null, null));
+        return;
+      }
+      const table = el("table", {}, [
+        el("thead", {}, [el("tr", {}, ["Data / Hora", "Usuário", "Ação", "Parâmetro", "Campo", "Valor Anterior", "Valor Novo"].map((h) => el("th", {}, [h])))]),
+        el("tbody", {}, list.map((r) => el("tr", {}, [
+          el("td", { class: "small" }, [fmtDateTime(r.criadoEm)]),
+          el("td", {}, [el("strong", {}, [r.usuarioNome]), el("div", { class: "small muted" }, [ROLE_LABEL[r.usuarioRole] || r.usuarioRole])]),
+          el("td", {}, [el("span", { class: "badge " + (TIPO_ACAO_BADGE[r.tipoAcao] || "badge-gray") }, [r.tipoAcao])]),
+          el("td", {}, [r.parametroProduto || "—"]),
+          el("td", { class: "small" }, [r.campoAlterado]),
+          el("td", { class: "small muted", style: "max-width:220px; white-space:normal;" }, [r.valorAnterior ?? "—"]),
+          el("td", { class: "small", style: "max-width:220px; white-space:normal;" }, [r.valorNovo ?? "—"]),
+        ]))),
+      ]);
+      tableWrap.appendChild(el("div", { class: "table-wrap" }, [table]));
+    }
+
+    searchBox.querySelector("input").addEventListener("input", Utils.debounce((e) => { filters.busca = e.target.value; renderTable(); }, 200));
+    selAcao.addEventListener("change", (e) => { filters.acao = e.target.value; renderTable(); });
+
+    const header = el("div", { class: "row-between" }, [
+      el("div", {}, [
+        el("h3", { class: "card-title" }, ["Histórico de Alterações — Parâmetros Técnicos"]),
+        el("p", { class: "card-subtitle mt-8" }, ["Registro permanente de quem alterou, o que foi alterado, valor anterior e novo valor. Do mais recente para o mais antigo."]),
+      ]),
+      el("a", { class: "btn btn-secondary", href: "#/parametros" }, ["Voltar"]),
+    ]);
+    const filtersBar = el("div", { class: "filters-bar" }, [searchBox, selAcao]);
+
+    container.appendChild(el("div", { class: "stack" }, [header, filtersBar, tableWrap]));
+    renderTable();
   }
 
   // ------------------------------------------------------------
@@ -1114,5 +1196,5 @@
     renderList();
   }
 
-  window.Views = { login, dashboard, calculadora, orcamentosList, orcamentoDetalhe, parametros, usuarios, TIPO_LABEL, STATUS_OPTIONS, ROLE_LABEL };
+  window.Views = { login, dashboard, calculadora, orcamentosList, orcamentoDetalhe, parametros, parametrosHistorico, usuarios, TIPO_LABEL, STATUS_OPTIONS, ROLE_LABEL };
 })();

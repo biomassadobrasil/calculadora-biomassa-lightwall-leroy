@@ -85,6 +85,44 @@ async function migrate() {
       unidade TEXT
     );
   `);
+  // Auditoria dos Parâmetros Técnicos — sem FK para parametros/users de propósito:
+  // o registro deve sobreviver mesmo que o parâmetro ou o usuário sejam excluídos depois,
+  // e nenhuma rota da API permite alterar ou apagar linhas desta tabela (histórico permanente).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS parametros_auditoria (
+      id TEXT PRIMARY KEY,
+      parametro_id TEXT,
+      parametro_produto TEXT NOT NULL,
+      parametro_chave TEXT,
+      campo_alterado TEXT NOT NULL,
+      valor_anterior TEXT,
+      valor_novo TEXT,
+      tipo_acao TEXT NOT NULL CHECK (tipo_acao IN ('Inclusão','Alteração','Exclusão')),
+      usuario_id INTEGER,
+      usuario_nome TEXT NOT NULL,
+      usuario_role TEXT NOT NULL,
+      criado_em TIMESTAMPTZ NOT NULL
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_parametros_auditoria_criado_em ON parametros_auditoria (criado_em DESC);`);
+}
+
+/** Executa fn(client) dentro de uma transação (BEGIN/COMMIT/ROLLBACK).
+ *  Usado para garantir que a alteração do parâmetro e o respectivo registro de
+ *  auditoria sejam salvos juntos, sempre — nunca um sem o outro. */
+async function withTransaction(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 async function seedParametros() {
@@ -128,4 +166,4 @@ async function initDb() {
   await seedMasterUser();
 }
 
-module.exports = { pool, initDb, resetParametros, SEED_PARAMETROS };
+module.exports = { pool, initDb, resetParametros, withTransaction, SEED_PARAMETROS };
