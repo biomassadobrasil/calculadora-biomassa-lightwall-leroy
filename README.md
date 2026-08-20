@@ -155,9 +155,19 @@ nenhuma senha. O fluxo é:
    para não revelar quais e-mails estão cadastrados.
 6. Na lista de **Usuários**, o Master pode clicar em **"Reenviar convite"** para qualquer
    usuário "Pendente de ativação" — isso invalida o link anterior e gera um novo.
-7. Se o envio do e-mail falhar (ex.: Resend fora do ar), o usuário **ainda é criado** com
-   status pendente — o Master só precisa usar "Reenviar convite" depois; a criação do
-   registro no banco nunca depende do envio do e-mail ter funcionado.
+7. Se o envio do e-mail falhar (ex.: Resend fora do ar, ou domínio ainda não verificado —
+   ver aviso abaixo), o usuário **ainda é criado** com status pendente — a criação do
+   registro no banco nunca depende do envio do e-mail ter funcionado. Toda tela de
+   criar/reenviar convite também exibe o **link de ativação com um botão "Copiar link"**,
+   para o Master enviar manualmente (WhatsApp, Teams etc.) quando o e-mail não estiver
+   disponível — é exatamente o mesmo link que iria no e-mail, não um dado adicional.
+
+> ⚠️ **Enquanto o domínio `biomassadobrasil.com.br` não for verificado no Resend**, o
+> remetente de testes (`onboarding@resend.dev`) só consegue entregar e-mails para o
+> próprio endereço da conta Resend — para qualquer outro destinatário (ou seja, qualquer
+> colaborador real), o envio falha. Use o botão "Copiar link" como alternativa até a
+> verificação do domínio ser concluída (Resend → Domains → Add Domain → adicionar os
+> registros DNS informados → Verify).
 
 **Status possíveis:** Pendente de ativação (criado, sem senha) → Ativo (senha criada, pode
 logar) → Inativo (desativado pelo Master; qualquer convite pendente é invalidado no mesmo

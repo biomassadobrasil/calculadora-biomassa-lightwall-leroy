@@ -74,7 +74,11 @@ router.post("/", async (req, res, next) => {
     }
 
     const emailWarning = await enviarConviteBestEffort(novoUsuario, link);
-    res.status(201).json({ ...publicUser(novoUsuario), emailWarning });
+    // O link também é devolvido ao Master (não só enviado por e-mail) para que ele possa
+    // compartilhar manualmente (WhatsApp, Teams etc.) caso o e-mail automático falhe ou
+    // ainda não esteja configurado com um domínio verificado — é o mesmo link que iria
+    // no e-mail, não um segredo adicional.
+    res.status(201).json({ ...publicUser(novoUsuario), emailWarning, activationLink: link });
   } catch (err) {
     next(err);
   }
@@ -93,8 +97,7 @@ router.post("/:id/reenviar-convite", async (req, res, next) => {
       return gravarTokenERetornarLink(req, client, id, generateActivationToken());
     });
     const emailWarning = await enviarConviteBestEffort(user, link);
-    if (emailWarning) return res.status(502).json({ error: emailWarning });
-    res.json({ ok: true, message: `Convite reenviado para ${user.email}.` });
+    res.json({ ok: true, message: `Convite reenviado para ${user.email}.`, emailWarning, activationLink: link });
   } catch (err) {
     next(err);
   }

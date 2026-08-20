@@ -1223,7 +1223,7 @@
               ? el("button", {
                   class: "btn btn-ghost btn-icon", title: "Reenviar convite",
                   onclick: async () => {
-                    try { const r = await DB.Usuarios.reenviarConvite(u.id); toast(r.message || "Convite reenviado.", "success"); }
+                    try { const r = await DB.Usuarios.reenviarConvite(u.id); mostrarLinkConvite(r.message || "Convite reenviado.", r); }
                     catch (e) { toast(e.message || "Não foi possível reenviar o convite.", "error"); }
                   },
                 }, [iconSvg("M4 4h16v16H4V4Zm0 0 8 8 8-8")])
@@ -1259,6 +1259,35 @@
       } catch (e) { toast(e.message || "Não foi possível atualizar.", "error"); }
     }
 
+    // Mostra o resultado de criar/reenviar um convite: a mensagem (sucesso ou aviso de
+    // falha no e-mail) + o próprio link de ativação, para o Master copiar e enviar
+    // manualmente (WhatsApp, Teams etc.) se o e-mail automático não estiver disponível —
+    // é o mesmo link que o e-mail conteria, não um dado adicional.
+    function mostrarLinkConvite(mensagem, resultado, tipoToast) {
+      if (!resultado || !resultado.activationLink) {
+        toast(mensagem, tipoToast || (resultado && resultado.emailWarning ? "error" : "success"));
+        return;
+      }
+      const linkInput = el("input", { type: "text", readonly: "readonly", value: resultado.activationLink, style: "flex:1;" });
+      const btnCopiar = el("button", { class: "btn btn-secondary btn-sm" }, ["Copiar link"]);
+      btnCopiar.addEventListener("click", async () => {
+        try { await navigator.clipboard.writeText(resultado.activationLink); toast("Link copiado.", "success"); }
+        catch (e) { linkInput.select(); toast("Selecione e copie o link (Ctrl+C).", "info"); }
+      });
+      const body = el("div", { class: "stack" }, [
+        el("p", { class: "muted" }, [mensagem]),
+        el("div", { class: "field" }, [
+          el("label", {}, ["Link de convite (válido por 48h, uso único)"]),
+          el("div", { class: "row", style: "gap:8px;" }, [linkInput, btnCopiar]),
+        ]),
+      ]);
+      openModal({
+        title: resultado.emailWarning ? "E-mail não enviado — use o link manualmente" : "Convite enviado",
+        bodyNode: body,
+        footerNode: el("button", { class: "btn btn-primary", onclick: () => closeModal() }, ["Ok, entendi"]),
+      });
+    }
+
     // Criação por convite: o administrador nunca define nem vê a senha do usuário — ela é
     // criada pelo próprio usuário, através de um link seguro enviado por e-mail.
     function openNovoUsuarioModal() {
@@ -1289,17 +1318,8 @@
               all.push(saved);
               closeModal();
               renderList();
-              if (saved.emailWarning) {
-                toast(saved.emailWarning, "error");
-              } else {
-                openModal({
-                  title: "Usuário criado com sucesso!",
-                  bodyNode: el("p", { class: "muted" }, [
-                    `Um e-mail de ativação foi enviado para ${saved.email}. O usuário deverá acessar o link recebido para criar sua senha.`,
-                  ]),
-                  footerNode: el("button", { class: "btn btn-primary", onclick: () => closeModal() }, ["Ok, entendi"]),
-                });
-              }
+              const mensagem = saved.emailWarning || `Usuário criado com sucesso! Um e-mail de ativação foi enviado para ${saved.email}. O usuário deverá acessar o link recebido para criar sua senha.`;
+              mostrarLinkConvite(mensagem, saved, saved.emailWarning ? "error" : "success");
             } catch (e) { toast(e.message || "Não foi possível criar o usuário.", "error"); }
           },
         }, ["Criar Usuário"]),
