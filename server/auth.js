@@ -4,6 +4,7 @@
 "use strict";
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const { pool } = require("./db");
 
 const COOKIE_NAME = "biomassa_session";
@@ -12,6 +13,21 @@ if (!JWT_SECRET) {
   console.error("[auth] Variável de ambiente JWT_SECRET não configurada. Defina um valor aleatório e secreto no Railway.");
 }
 const TOKEN_TTL_SECONDS = 7 * 24 * 3600; // 7 dias
+const ACTIVATION_TOKEN_TTL_HOURS = 48; // validade do link de ativação/convite
+
+/** Gera um token de ativação aleatório e sua respectiva hash (o que fica salvo no banco).
+ *  Só o token "cru" (não a hash) vai no link do e-mail — como uma senha, a hash sozinha
+ *  não permite reconstruir o token original. */
+function generateActivationToken() {
+  const raw = crypto.randomBytes(32).toString("base64url");
+  const hash = hashToken(raw);
+  const expiresAt = new Date(Date.now() + ACTIVATION_TOKEN_TTL_HOURS * 3600 * 1000);
+  return { raw, hash, expiresAt };
+}
+
+function hashToken(raw) {
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
 
 function signToken(userId) {
   return jwt.sign({ uid: userId }, JWT_SECRET || "dev-only-insecure-secret", { expiresIn: TOKEN_TTL_SECONDS });
@@ -40,7 +56,7 @@ async function comparePassword(plain, hash) {
 
 function publicUser(row) {
   if (!row) return null;
-  return { id: row.id, name: row.name, email: row.email, role: row.role, active: row.active, createdAt: row.created_at };
+  return { id: row.id, name: row.name, email: row.email, role: row.role, status: row.status, createdAt: row.created_at };
 }
 
 /** Exige sessão válida; carrega o usuário FRESCO do banco a cada requisição
@@ -57,7 +73,7 @@ async function requireAuth(req, res, next) {
     }
     const { rows } = await pool.query("SELECT * FROM users WHERE id = $1", [payload.uid]);
     const user = rows[0];
-    if (!user || !user.active) return res.status(401).json({ error: "Usuário inexistente ou desativado." });
+    if (!user || user.status !== "ativo") return res.status(401).json({ error: "Usuário inexistente, pendente de ativação ou desativado." });
     req.user = publicUser(user);
     next();
   } catch (err) {
@@ -77,4 +93,5 @@ function requireRole(role) {
 module.exports = {
   COOKIE_NAME, signToken, setSessionCookie, clearSessionCookie,
   hashPassword, comparePassword, publicUser, requireAuth, requireRole,
+  generateActivationToken, hashToken, ACTIVATION_TOKEN_TTL_HOURS,
 };

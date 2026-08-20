@@ -115,11 +115,13 @@ Em **Settings → Variables** do serviço da aplicação, adicione:
 | `JWT_SECRET` | uma string aleatória longa e secreta (gerada para este projeto — ver mensagem separada) |
 | `MASTER_EMAIL` | o e-mail do primeiro usuário Master (ex.: seu e-mail) |
 | `MASTER_PASSWORD` | a senha inicial desse usuário Master (troque depois de logar, se quiser) |
+| `RESEND_API_KEY` | chave de API do [resend.com](https://resend.com) (conta gratuita), usada para enviar os e-mails de convite/ativação de conta |
+| `RESEND_FROM` *(opcional)* | remetente dos e-mails, formato `Nome <email>`. Se não definir, usa `Calculadora Biomassa & Lightwall <onboarding@resend.dev>` (domínio de testes do Resend — funciona, mas para produção considere verificar `biomassadobrasil.com.br` no Resend e usar um endereço próprio) |
 
-Essas duas últimas só têm efeito **uma vez**: na primeira inicialização, se a tabela de
-usuários estiver vazia, o servidor cria automaticamente esse usuário Master. Depois disso,
-todos os demais usuários (Master ou Colaborador) são criados pela tela **Usuários**, dentro
-do próprio app.
+`MASTER_EMAIL`/`MASTER_PASSWORD` só têm efeito **uma vez**: na primeira inicialização, se a
+tabela de usuários estiver vazia, o servidor cria automaticamente esse usuário Master (já
+ativo, sem precisar de convite por e-mail). Todos os demais usuários são criados pela tela
+**Usuários**, por convite (ver seção abaixo).
 
 ### 3. Deploy
 Basta um `git push` para o branch `main` — o Railway reconstrói e reinicia o serviço
@@ -130,7 +132,37 @@ automaticamente (ele agora executa `node server/index.js`, em vez do antigo serv
 1. Acesse a URL do app — você verá a tela de login.
 2. Entre com o `MASTER_EMAIL` / `MASTER_PASSWORD` configurados no passo anterior.
 3. Vá em **Usuários** → **Novo Usuário** para cadastrar os colaboradores (perfil "Básico").
-4. Cada colaborador recebe o e-mail/senha e faz login para começar a criar orçamentos.
+4. Cada colaborador recebe um e-mail de ativação e cria a própria senha (ver seção abaixo) —
+   o Master nunca define nem vê a senha de ninguém.
+
+## Cadastro de usuários por convite (ativação por e-mail)
+
+Ao criar um usuário na tela **Usuários**, o Master informa só **nome, e-mail e perfil** —
+nenhuma senha. O fluxo é:
+
+1. O sistema cria o usuário com status **"Pendente de ativação"** e gera um token de
+   ativação aleatório (32 bytes). Só a **hash SHA-256** do token é salva no banco
+   (`activation_tokens.token_hash`) — o token em si só existe no e-mail enviado, exatamente
+   como uma senha nunca é guardada em texto puro.
+2. Um e-mail é enviado (via Resend) para o endereço cadastrado, com um botão **"Criar minha
+   senha / Ativar minha conta"** apontando para `.../#/ativar-conta/<token>`.
+3. O link é válido por **48 horas** e só pode ser usado **uma vez** — ao criar a senha, o
+   token é marcado como usado (`used_at`) e não funciona novamente.
+4. Na página de ativação, o usuário cria e confirma a senha (mínimo 6 caracteres, com botão
+   de mostrar/ocultar 👁️ nos dois campos) e já é autenticado automaticamente ao concluir.
+5. Se o link expirar, a própria página de ativação oferece **"Solicitar novo link"** —
+   basta informar o e-mail; a resposta é sempre a mesma frase, tenha o e-mail conta ou não,
+   para não revelar quais e-mails estão cadastrados.
+6. Na lista de **Usuários**, o Master pode clicar em **"Reenviar convite"** para qualquer
+   usuário "Pendente de ativação" — isso invalida o link anterior e gera um novo.
+7. Se o envio do e-mail falhar (ex.: Resend fora do ar), o usuário **ainda é criado** com
+   status pendente — o Master só precisa usar "Reenviar convite" depois; a criação do
+   registro no banco nunca depende do envio do e-mail ter funcionado.
+
+**Status possíveis:** Pendente de ativação (criado, sem senha) → Ativo (senha criada, pode
+logar) → Inativo (desativado pelo Master; qualquer convite pendente é invalidado no mesmo
+momento). O Master pode alternar entre Ativo/Inativo pela lista de Usuários; "Pendente" só
+é alcançado na criação e só é encerrado pela própria ativação.
 
 ## Rodar localmente (opcional, requer Node.js instalado)
 

@@ -50,12 +50,38 @@ async function migrate() {
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
+      password_hash TEXT,
       role TEXT NOT NULL CHECK (role IN ('master','basico')),
-      active BOOLEAN NOT NULL DEFAULT true,
+      status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','ativo','inativo')),
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  // --- Migração para bancos criados ANTES do fluxo de ativação por convite:
+  // essas colunas/valores só existiam no formato antigo (senha obrigatória, "active" booleano).
+  // Cada passo verifica o que falta antes de agir, então é seguro rodar em todo boot,
+  // inclusive depois que a migração já foi concluída (não repete trabalho nem falha).
+  await pool.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','ativo','inativo'));`);
+  await pool.query(`UPDATE users SET status = 'ativo' WHERE status = 'pendente' AND password_hash IS NOT NULL AND password_hash <> '';`);
+  const { rows: temColunaActive } = await pool.query(
+    `SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'active'`
+  );
+  if (temColunaActive.length > 0) {
+    await pool.query(`UPDATE users SET status = 'inativo' WHERE active = false AND status <> 'inativo';`);
+    await pool.query(`ALTER TABLE users DROP COLUMN active;`);
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS activation_tokens (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_activation_tokens_user ON activation_tokens (user_id);`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS orcamentos (
       id TEXT PRIMARY KEY,
@@ -154,7 +180,7 @@ async function seedMasterUser() {
   }
   const hash = await bcrypt.hash(password, 10);
   await pool.query(
-    `INSERT INTO users (name, email, password_hash, role, active) VALUES ($1,$2,$3,'master',true)`,
+    `INSERT INTO users (name, email, password_hash, role, status) VALUES ($1,$2,$3,'master','ativo')`,
     [process.env.MASTER_NAME || "Administrador", email.toLowerCase().trim(), hash]
   );
   console.log(`[db] Usuário Master inicial criado: ${email}`);

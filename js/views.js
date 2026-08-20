@@ -48,22 +48,34 @@
       inputNode = el("textarea", { id: opts.id, placeholder: opts.placeholder || "" });
       inputNode.value = opts.value || "";
     } else {
-      const group = opts.suffix ? el("div", { class: "input-suffix-group" }) : null;
+      const isPassword = opts.type === "password";
+      const group = (opts.suffix || isPassword) ? el("div", { class: "input-suffix-group" }) : null;
       inputNode = el("input", {
         type: opts.type || "text", id: opts.id,
         placeholder: opts.placeholder || "",
         step: opts.step || (opts.type === "number" ? "any" : null),
         min: opts.min !== undefined ? opts.min : null,
-        autocomplete: opts.type === "password" ? "current-password" : null,
+        autocomplete: isPassword ? "current-password" : null,
       });
       inputNode.value = opts.value !== undefined && opts.value !== null ? opts.value : "";
       if (group) {
         group.appendChild(inputNode);
-        group.appendChild(el("span", { class: "input-suffix" }, [opts.suffix]));
+        if (isPassword) {
+          const toggleBtn = el("button", { type: "button", class: "password-toggle-btn", title: "Mostrar/ocultar senha" }, [iconEye()]);
+          toggleBtn.addEventListener("click", () => {
+            const showing = inputNode.type === "text";
+            inputNode.type = showing ? "password" : "text";
+            toggleBtn.innerHTML = "";
+            toggleBtn.appendChild(showing ? iconEye() : iconEyeOff());
+          });
+          group.appendChild(toggleBtn);
+        } else {
+          group.appendChild(el("span", { class: "input-suffix" }, [opts.suffix]));
+        }
         wrapper.appendChild(group);
       }
     }
-    if (!(opts.suffix && opts.type !== "select" && opts.type !== "textarea")) {
+    if (!((opts.suffix || opts.type === "password") && opts.type !== "select" && opts.type !== "textarea")) {
       wrapper.appendChild(inputNode);
     }
     if (opts.hint) wrapper.appendChild(el("span", { class: "hint" }, [opts.hint]));
@@ -118,18 +130,103 @@
     });
 
     const card = el("div", { class: "card", style: "max-width:380px; width:100%;" }, [
-      el("div", { class: "row", style: "gap:12px; align-items:center; margin-bottom:20px;" }, [
-        el("div", { class: "brand-mark" }, ["B"]),
-        el("div", {}, [
-          el("strong", { style: "display:block; font-size:15px;" }, ["Biomassa & Lightwall"]),
-          el("span", { class: "muted small" }, ["Calculadora de quantitativos"]),
-        ]),
-      ]),
+      brandHeader(),
       el("h2", { style: "font-size:18px; margin-bottom:4px;" }, ["Entrar"]),
       el("p", { class: "muted small", style: "margin-bottom:16px;" }, ["Acesse com o e-mail e senha cadastrados pelo seu gestor."]),
       form,
     ]);
     container.appendChild(card);
+  }
+
+  function brandHeader() {
+    return el("div", { class: "row", style: "gap:12px; align-items:center; margin-bottom:20px;" }, [
+      el("div", { class: "brand-mark" }, ["B"]),
+      el("div", {}, [
+        el("strong", { style: "display:block; font-size:15px;" }, ["Biomassa & Lightwall"]),
+        el("span", { class: "muted small" }, ["Calculadora de quantitativos"]),
+      ]),
+    ]);
+  }
+
+  // ------------------------------------------------------------
+  // ATIVAÇÃO DE CONTA POR CONVITE (rota pública, sem login)
+  // ------------------------------------------------------------
+  async function ativarConta(container, token) {
+    container.innerHTML = "";
+    container.appendChild(loadingBlock());
+    const info = await DB.Auth.activationInfo(token);
+    container.innerHTML = "";
+
+    if (!info.valid) {
+      renderLinkInvalido(info.error);
+      return;
+    }
+
+    const fSenha = field({ id: "ativ-senha", label: "Criar senha", required: true, type: "password", hint: "Mínimo de 6 caracteres.", placeholder: "••••••••" });
+    const fConfirma = field({ id: "ativ-confirma", label: "Confirmar senha", required: true, type: "password", placeholder: "••••••••" });
+    const errorBox = el("div", { class: "alert alert-warning hidden" }, []);
+    const btnAtivar = el("button", { class: "btn btn-primary btn-block", type: "submit" }, ["Confirmar criação da senha"]);
+
+    const form = el("form", {}, [fSenha.wrapper, fConfirma.wrapper, errorBox, el("div", { class: "mt-16" }, [btnAtivar])]);
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorBox.classList.add("hidden");
+      [fSenha, fConfirma].forEach((f) => f.clearError());
+      let ok = true;
+      if (!fSenha.value() || fSenha.value().length < 6) { fSenha.setError("A senha deve ter ao menos 6 caracteres."); ok = false; }
+      if (fConfirma.value() !== fSenha.value()) { fConfirma.setError("As senhas não coincidem."); ok = false; }
+      if (!ok) return;
+      btnAtivar.disabled = true; btnAtivar.textContent = "Ativando...";
+      try {
+        const user = await DB.Auth.activate(token, fSenha.value(), fConfirma.value());
+        toast("Conta ativada com sucesso! Bem-vindo(a).", "success");
+        location.hash = user.role === "master" ? "#/dashboard" : "#/orcamentos";
+      } catch (err) {
+        errorBox.textContent = err.message || "Não foi possível ativar a conta.";
+        errorBox.classList.remove("hidden");
+        btnAtivar.disabled = false; btnAtivar.textContent = "Confirmar criação da senha";
+      }
+    });
+
+    const card = el("div", { class: "card", style: "max-width:400px; width:100%;" }, [
+      brandHeader(),
+      el("h2", { style: "font-size:18px; margin-bottom:4px;" }, ["Ativar minha conta"]),
+      el("p", { class: "muted small", style: "margin-bottom:4px;" }, [
+        "Olá, ", el("strong", {}, [info.user.name]), ". Crie uma senha para acessar o sistema com o e-mail ",
+        el("strong", {}, [info.user.email]), ".",
+      ]),
+      el("p", { class: "muted small", style: "margin-bottom:16px;" }, ["Perfil de acesso: ", ROLE_LABEL[info.user.role] || info.user.role, "."]),
+      form,
+    ]);
+    container.appendChild(card);
+
+    function renderLinkInvalido(mensagem) {
+      const fEmail = field({ id: "ativ-email-novo", label: "Seu e-mail", required: true, placeholder: "seuemail@empresa.com" });
+      const btnSolicitar = el("button", { class: "btn btn-primary btn-block" }, ["Solicitar novo link"]);
+      const msgBox = el("div", { class: "alert alert-info hidden mt-16" }, []);
+      btnSolicitar.addEventListener("click", async () => {
+        fEmail.clearError();
+        if (!fEmail.value().trim()) { fEmail.setError("Informe seu e-mail."); return; }
+        btnSolicitar.disabled = true; btnSolicitar.textContent = "Enviando...";
+        try {
+          const resp = await DB.Auth.solicitarNovoLink(fEmail.value().trim());
+          msgBox.textContent = resp.message;
+          msgBox.classList.remove("hidden");
+        } finally {
+          btnSolicitar.disabled = false; btnSolicitar.textContent = "Solicitar novo link";
+        }
+      });
+      const card = el("div", { class: "card", style: "max-width:400px; width:100%;" }, [
+        brandHeader(),
+        el("div", { class: "alert alert-warning" }, [mensagem || "Link de ativação inválido."]),
+        el("p", { class: "muted small mt-16", style: "margin-bottom:12px;" }, ["Informe o e-mail cadastrado para receber um novo link de ativação."]),
+        fEmail.wrapper,
+        el("div", { class: "mt-8" }, [btnSolicitar]),
+        msgBox,
+        el("div", { class: "mt-16" }, [el("a", { class: "btn btn-secondary btn-block", href: "#/login" }, ["Voltar para o login"])]),
+      ]);
+      container.appendChild(card);
+    }
   }
 
   // ------------------------------------------------------------
@@ -245,6 +342,7 @@
   const iconEdit = () => iconSvg("M4 20h4L19.5 8.5a1.5 1.5 0 0 0 0-2.1l-1.9-1.9a1.5 1.5 0 0 0-2.1 0L4 15v5Zm10-13.5L17.5 10");
   const iconTrash = () => iconSvg("M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6");
   const iconEye = () => iconSvg("M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z");
+  const iconEyeOff = () => iconSvg("M3 3l18 18M10.6 5.2A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a15.6 15.6 0 0 1-3.2 4M6.6 6.6C4 8.3 2 12 2 12s3.5 7 10 7a9.9 9.9 0 0 0 4-.8M9.9 9.9a3 3 0 0 0 4.2 4.2");
   const iconDownload = () => iconSvg("M12 3v12m0 0-4-4m4 4 4-4M4 19h16");
   const iconPrint = () => iconSvg("M6 9V3h12v6M6 18h12v3H6v-3ZM4 9h16v7H4V9Z");
   const iconPower = () => iconSvg("M12 2v9M18.4 6.6a8 8 0 1 1-12.8 0");
@@ -1094,6 +1192,9 @@
   // ------------------------------------------------------------
   // USUÁRIOS (somente Master)
   // ------------------------------------------------------------
+  const STATUS_USUARIO_BADGE = { pendente: "badge-amber", ativo: "badge-green", inativo: "badge-gray" };
+  const STATUS_USUARIO_LABEL = { pendente: "Pendente de ativação", ativo: "Ativo", inativo: "Inativo" };
+
   async function usuarios(container) {
     container.innerHTML = "";
     container.appendChild(loadingBlock());
@@ -1115,11 +1216,22 @@
           el("td", {}, [u.name + (u.id === meId ? " (você)" : "")]),
           el("td", {}, [u.email]),
           el("td", {}, [el("span", { class: "badge " + (u.role === "master" ? "badge-blue" : "badge-gray") }, [ROLE_LABEL[u.role] || u.role])]),
-          el("td", {}, [el("span", { class: "badge " + (u.active ? "badge-green" : "badge-gray") }, [el("span", { class: "badge-dot" }), u.active ? "Ativo" : "Inativo"])]),
+          el("td", {}, [el("span", { class: "badge " + (STATUS_USUARIO_BADGE[u.status] || "badge-gray") }, [el("span", { class: "badge-dot" }), STATUS_USUARIO_LABEL[u.status] || u.status])]),
           el("td", {}, [fmtDate(u.createdAt)]),
           el("td", {}, [el("div", { class: "table-actions" }, [
+            u.status === "pendente"
+              ? el("button", {
+                  class: "btn btn-ghost btn-icon", title: "Reenviar convite",
+                  onclick: async () => {
+                    try { const r = await DB.Usuarios.reenviarConvite(u.id); toast(r.message || "Convite reenviado.", "success"); }
+                    catch (e) { toast(e.message || "Não foi possível reenviar o convite.", "error"); }
+                  },
+                }, [iconSvg("M4 4h16v16H4V4Zm0 0 8 8 8-8")])
+              : null,
             el("button", { class: "btn btn-ghost btn-icon", title: "Editar", onclick: () => openUsuarioModal(u) }, [iconEdit()]),
-            el("button", { class: "btn btn-ghost btn-icon", title: u.active ? "Desativar" : "Ativar", onclick: () => toggleActive(u) }, [iconPower()]),
+            u.status !== "pendente"
+              ? el("button", { class: "btn btn-ghost btn-icon", title: u.status === "ativo" ? "Desativar" : "Ativar", onclick: () => toggleStatus(u) }, [iconPower()])
+              : null,
             el("button", {
               class: "btn btn-ghost btn-icon", title: "Excluir",
               onclick: () => confirmDialog({
@@ -1131,52 +1243,93 @@
                 },
               }),
             }, [iconTrash()]),
-          ])]),
+          ].filter(Boolean))]),
         ]))),
       ]);
       tableWrap.appendChild(el("div", { class: "table-wrap" }, [table]));
     }
 
-    async function toggleActive(u) {
+    async function toggleStatus(u) {
+      const novoStatus = u.status === "ativo" ? "inativo" : "ativo";
       try {
-        const saved = await DB.Usuarios.save({ id: u.id, name: u.name, role: u.role, active: !u.active });
+        const saved = await DB.Usuarios.save({ id: u.id, name: u.name, role: u.role, status: novoStatus });
         Object.assign(u, saved);
-        toast(u.active ? "Usuário ativado." : "Usuário desativado.", "success");
+        toast(novoStatus === "ativo" ? "Usuário ativado." : "Usuário desativado.", "success");
         renderList();
       } catch (e) { toast(e.message || "Não foi possível atualizar.", "error"); }
     }
 
-    function openUsuarioModal(existing) {
-      const fNome = field({ id: "us-nome", label: "Nome", required: true, value: existing ? existing.name : "" });
-      const fEmail = field({ id: "us-email", label: "E-mail", required: !existing, value: existing ? existing.email : "", hint: existing ? "O e-mail não pode ser alterado após a criação." : "" });
-      if (existing) fEmail.input.disabled = true;
-      const fSenha = field({ id: "us-senha", label: existing ? "Nova Senha" : "Senha", type: "password", required: !existing, hint: existing ? "Deixe em branco para manter a senha atual." : "Mínimo de 6 caracteres." });
-      const fPerfil = field({ id: "us-perfil", label: "Perfil", type: "select", value: existing ? existing.role : "basico", options: [{ value: "basico", label: "Básico (Colaborador)" }, { value: "master", label: "Master (Gestor)" }] });
-      const ativoInput = Object.assign(document.createElement("input"), { type: "checkbox", checked: existing ? existing.active : true });
-      const cAtivo = el("label", { class: "checkbox-row" }, [ativoInput, "Usuário ativo"]);
+    // Criação por convite: o administrador nunca define nem vê a senha do usuário — ela é
+    // criada pelo próprio usuário, através de um link seguro enviado por e-mail.
+    function openNovoUsuarioModal() {
+      const fNome = field({ id: "us-nome", label: "Nome", required: true });
+      const fEmail = field({ id: "us-email", label: "E-mail", required: true, hint: "O convite de ativação será enviado para este endereço." });
+      const fPerfil = field({ id: "us-perfil", label: "Perfil", type: "select", value: "basico", options: [{ value: "basico", label: "Básico (Colaborador)" }, { value: "master", label: "Master (Gestor)" }] });
 
-      const body = el("div", { class: "form-grid" }, [fNome.wrapper, fEmail.wrapper, fSenha.wrapper, fPerfil.wrapper, el("div", { class: "field full" }, [cAtivo])]);
+      const body = el("div", { class: "stack" }, [
+        el("div", { class: "alert alert-info" }, [
+          iconSvg("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-6h2Zm0-8h-2V7h2Z"),
+          el("span", {}, ["O usuário receberá um e-mail com um link seguro para criar a própria senha. Você não define nem vê a senha dele."]),
+        ]),
+        el("div", { class: "form-grid" }, [fNome.wrapper, fEmail.wrapper, fPerfil.wrapper]),
+      ]);
       const footer = el("div", { class: "row" }, [
         el("button", { class: "btn btn-secondary", onclick: () => closeModal() }, ["Cancelar"]),
         el("button", {
           class: "btn btn-primary",
           onclick: async () => {
-            [fNome, fEmail, fSenha].forEach((f) => f.clearError());
+            [fNome, fEmail].forEach((f) => f.clearError());
             let ok = true;
             if (!fNome.value().trim()) { fNome.setError("Informe o nome."); ok = false; }
-            if (!existing) {
-              if (!fEmail.value().trim()) { fEmail.setError("Informe o e-mail."); ok = false; }
-              else if (!EMAIL_RE.test(fEmail.value().trim())) { fEmail.setError("Informe um e-mail válido."); ok = false; }
-              if (!fSenha.value()) { fSenha.setError("Informe uma senha."); ok = false; }
-            }
+            if (!fEmail.value().trim()) { fEmail.setError("Informe o e-mail."); ok = false; }
+            else if (!EMAIL_RE.test(fEmail.value().trim())) { fEmail.setError("Informe um e-mail válido."); ok = false; }
+            if (!ok) return;
+            try {
+              const saved = await DB.Usuarios.save({ name: fNome.value().trim(), email: fEmail.value().trim(), role: fPerfil.value() });
+              all.push(saved);
+              closeModal();
+              renderList();
+              if (saved.emailWarning) {
+                toast(saved.emailWarning, "error");
+              } else {
+                openModal({
+                  title: "Usuário criado com sucesso!",
+                  bodyNode: el("p", { class: "muted" }, [
+                    `Um e-mail de ativação foi enviado para ${saved.email}. O usuário deverá acessar o link recebido para criar sua senha.`,
+                  ]),
+                  footerNode: el("button", { class: "btn btn-primary", onclick: () => closeModal() }, ["Ok, entendi"]),
+                });
+              }
+            } catch (e) { toast(e.message || "Não foi possível criar o usuário.", "error"); }
+          },
+        }, ["Criar Usuário"]),
+      ]);
+      openModal({ title: "Novo Usuário", bodyNode: body, footerNode: footer });
+    }
+
+    function openUsuarioModal(existing) {
+      const fNome = field({ id: "us-nome-edit", label: "Nome", required: true, value: existing.name });
+      const fEmail = field({ id: "us-email-edit", label: "E-mail", value: existing.email, hint: "O e-mail não pode ser alterado após a criação." });
+      fEmail.input.disabled = true;
+      const fSenha = field({ id: "us-senha-edit", label: "Redefinir Senha", type: "password", hint: "Deixe em branco para manter a senha atual (ou, se pendente, aguardar a ativação)." });
+      const fPerfil = field({ id: "us-perfil-edit", label: "Perfil", type: "select", value: existing.role, options: [{ value: "basico", label: "Básico (Colaborador)" }, { value: "master", label: "Master (Gestor)" }] });
+
+      const body = el("div", { class: "form-grid" }, [fNome.wrapper, fEmail.wrapper, fSenha.wrapper, fPerfil.wrapper]);
+      const footer = el("div", { class: "row" }, [
+        el("button", { class: "btn btn-secondary", onclick: () => closeModal() }, ["Cancelar"]),
+        el("button", {
+          class: "btn btn-primary",
+          onclick: async () => {
+            [fNome, fSenha].forEach((f) => f.clearError());
+            let ok = true;
+            if (!fNome.value().trim()) { fNome.setError("Informe o nome."); ok = false; }
             if (fSenha.value() && fSenha.value().length < 6) { fSenha.setError("A senha deve ter ao menos 6 caracteres."); ok = false; }
             if (!ok) return;
-            const payload = { id: existing ? existing.id : undefined, name: fNome.value().trim(), role: fPerfil.value(), active: ativoInput.checked };
-            if (!existing) payload.email = fEmail.value().trim();
+            const payload = { id: existing.id, name: fNome.value().trim(), role: fPerfil.value() };
             if (fSenha.value()) payload.password = fSenha.value();
             try {
               const saved = await DB.Usuarios.save(payload);
-              if (existing) { Object.assign(existing, saved); } else { all.push(saved); }
+              Object.assign(existing, saved);
               closeModal();
               toast("Usuário salvo.", "success");
               renderList();
@@ -1184,17 +1337,17 @@
           },
         }, ["Salvar"]),
       ]);
-      openModal({ title: existing ? "Editar Usuário" : "Novo Usuário", bodyNode: body, footerNode: footer });
+      openModal({ title: "Editar Usuário", bodyNode: body, footerNode: footer });
     }
 
     const header = el("div", { class: "row-between" }, [
       el("div", {}, [el("h3", { class: "card-title" }, ["Usuários"]), el("p", { class: "card-subtitle mt-8" }, ["Gerencie quem tem acesso ao sistema e com qual perfil."])]),
-      el("button", { class: "btn btn-primary", onclick: () => openUsuarioModal(null) }, [iconPlus(), "Novo Usuário"]),
+      el("button", { class: "btn btn-primary", onclick: () => openNovoUsuarioModal() }, [iconPlus(), "Novo Usuário"]),
     ]);
 
     container.appendChild(el("div", { class: "stack" }, [header, tableWrap]));
     renderList();
   }
 
-  window.Views = { login, dashboard, calculadora, orcamentosList, orcamentoDetalhe, parametros, parametrosHistorico, usuarios, TIPO_LABEL, STATUS_OPTIONS, ROLE_LABEL };
+  window.Views = { login, ativarConta, dashboard, calculadora, orcamentosList, orcamentoDetalhe, parametros, parametrosHistorico, usuarios, TIPO_LABEL, STATUS_OPTIONS, ROLE_LABEL };
 })();

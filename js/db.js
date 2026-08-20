@@ -44,6 +44,21 @@
       try { await api("/api/auth/logout", { method: "POST" }); } finally { currentUser = null; }
     },
     getCurrentUser() { return currentUser; },
+    async activationInfo(token) {
+      try {
+        return await api("/api/auth/ativar/" + encodeURIComponent(token));
+      } catch (e) {
+        return { valid: false, error: e.message };
+      }
+    },
+    async activate(token, password, confirmPassword) {
+      const data = await api("/api/auth/ativar/" + encodeURIComponent(token), { method: "POST", body: { password, confirmPassword } });
+      currentUser = data.user;
+      return currentUser;
+    },
+    async solicitarNovoLink(email) {
+      return api("/api/auth/solicitar-novo-link", { method: "POST", body: { email } });
+    },
   };
 
   // ---------------- Orçamentos ----------------
@@ -111,6 +126,9 @@
     },
     async remove(id) {
       return api("/api/usuarios/" + encodeURIComponent(id), { method: "DELETE" });
+    },
+    async reenviarConvite(id) {
+      return api("/api/usuarios/" + encodeURIComponent(id) + "/reenviar-convite", { method: "POST" });
     },
   };
 

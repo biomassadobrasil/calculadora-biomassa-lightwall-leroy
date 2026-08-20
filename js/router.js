@@ -84,6 +84,16 @@
       return;
     }
 
+    // Ativação de conta por convite: rota pública, não exige sessão (o usuário ainda não tem uma).
+    const ativacao = path.match(/^\/ativar-conta\/([^/]+)$/);
+    if (ativacao) {
+      setShellVisible(false);
+      pageTitle.textContent = "Ativar Conta";
+      view.innerHTML = "";
+      await Views.ativarConta(view, ativacao[1]);
+      return;
+    }
+
     let user = DB.Auth.getCurrentUser();
     if (!user) {
       try { user = await DB.Auth.me(); } catch (e) { user = null; }
